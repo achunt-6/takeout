@@ -3,6 +3,7 @@ package com.cpy.takeout.controller;
 import com.cpy.takeout.entity.User;
 import com.cpy.takeout.service.UserService;
 import com.cpy.takeout.util.FileUploadUtil;
+import com.cpy.takeout.util.RedisCacheUtil;
 import com.cpy.takeout.util.Result;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -10,6 +11,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpSession;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/user")
@@ -17,12 +19,18 @@ public class UserController {
     @Resource
     private UserService userService;
 
+    @Resource
+    private RedisCacheUtil redisCacheUtil;
+
     // 登录接口
     @PostMapping("/login")
     public Result login(@RequestBody User user, HttpSession session){
         try {
             User loginUser = userService.login(user);
             session.setAttribute("loginUser", loginUser);
+            // 将用户信息缓存到 Redis，过期时间 30 分钟
+            String redisKey = "user:info:" + loginUser.getId();
+            redisCacheUtil.set(redisKey, loginUser, 30, TimeUnit.MINUTES);
             return Result.success(loginUser);
         } catch (RuntimeException e){
             return Result.error(e.getMessage());
